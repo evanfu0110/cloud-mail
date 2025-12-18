@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer} from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 export const setting = sqliteTable('setting', {
 	register: integer('register').default(0).notNull(),
 	receive: integer('receive').default(0).notNull(),
@@ -25,6 +25,7 @@ export const setting = sqliteTable('setting', {
 	ruleType: integer('rule_type').default(0).notNull(),
 	loginOpacity: integer('login_opacity').default(0.88),
 	resendTokens: text('resend_tokens').default("{}").notNull(),
+	aliyunConfig: text('aliyun_config').default("{}").notNull(),
 	noticeTitle: text('notice_title').default('').notNull(),
 	noticeContent: text('notice_content').default('').notNull(),
 	noticeType: text('notice_type').default('').notNull(),

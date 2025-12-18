@@ -34,15 +34,19 @@ const campaignService = {
     },
 
     /**
-     * 执行群发任务（简化版：一个账号发给多个目标）
+     * 执行群发任务（支持数据库账号和阿里云地址）
      */
     async sendBatch(c, params, userId) {
-        const { accountId, senderName, subject, content, batchSize = 10, targetUserIds = [] } = params;
+        const { accountId, fromAddress, senderName, subject, content, batchSize = 10, targetUserIds = [] } = params;
         const db = orm(c);
 
-        if (!accountId) {
-            throw new BizError('请选择发件账号');
+        // 验证：必须提供 accountId 或 fromAddress 之一
+        if (!accountId && !fromAddress) {
+            throw new BizError('请选择发件账号或阿里云地址');
         }
+
+        // 用于日志记录的标识（accountId 或特殊值）
+        const logAccountId = accountId || -1; // 阿里云使用 -1 作为占位符
 
         const targetIdsFilter = targetUserIds.length > 0
             ? sql`AND t.target_user_id IN (${sql.raw(targetUserIds.join(','))})`
@@ -57,7 +61,7 @@ const campaignService = {
               AND NOT EXISTS (
                   SELECT 1 FROM send_log s
                   WHERE s.target_user_id = t.target_user_id
-                    AND s.account_id = ${accountId}
+                    AND s.account_id = ${logAccountId}
                     AND s.user_id = ${userId}
               )
             LIMIT ${batchSize}
@@ -70,17 +74,30 @@ const campaignService = {
         let sentCount = 0;
         for (const target of targets) {
             try {
-                await emailService.send(c, {
-                    accountId: accountId,
-                    name: senderName || 'Campaign',
-                    receiveEmail: [target.to_email],
-                    subject: subject,
-                    content: content,
-                    attachments: []
-                }, userId);
+                // 判断使用哪种发送方式
+                if (fromAddress) {
+                    // 使用阿里云发送
+                    await this.sendViaAliyun(c, {
+                        fromAddress,
+                        toAddress: target.to_email,
+                        subject,
+                        htmlBody: content,
+                        fromAlias: senderName || 'Campaign'
+                    });
+                } else {
+                    // 使用 Resend 发送（通过 emailService）
+                    await emailService.send(c, {
+                        accountId: accountId,
+                        name: senderName || 'Campaign',
+                        receiveEmail: [target.to_email],
+                        subject: subject,
+                        content: content,
+                        attachments: []
+                    }, userId);
+                }
 
                 await db.insert(sendLog).values({
-                    accountId: accountId,
+                    accountId: logAccountId,
                     targetUserId: target.target_user_id,
                     userId: userId,
                     status: 0
@@ -89,7 +106,7 @@ const campaignService = {
             } catch (err) {
                 console.error(`Send failed to ${target.to_email}`, err);
                 await db.insert(sendLog).values({
-                    accountId: accountId,
+                    accountId: logAccountId,
                     targetUserId: target.target_user_id,
                     userId: userId,
                     status: 1,
@@ -99,6 +116,30 @@ const campaignService = {
         }
 
         return { sent: sentCount, status: 'processing' };
+    },
+
+    /**
+     * 通过阿里云发送邮件
+     */
+    async sendViaAliyun(c, params) {
+        const settingService = await import('./setting-service.js').then(m => m.default);
+        const aliyunEmailService = await import('./aliyun-email-service.js').then(m => m.default);
+
+        const settings = await settingService.query(c);
+        const aliyunConfig = JSON.parse(settings.aliyunConfig || '{}');
+
+        if (!aliyunConfig.accessKeyId || !aliyunConfig.accessKeySecret) {
+            throw new BizError('阿里云配置未完成，请先在设置页面配置');
+        }
+
+        const config = {
+            accessKeyId: aliyunConfig.accessKeyId,
+            accessKeySecret: aliyunConfig.accessKeySecret,
+            region: aliyunConfig.region || 'cn-hangzhou',
+            fromAddress: params.fromAddress
+        };
+
+        return await aliyunEmailService.send(config, params);
     },
 
     async listLogs(c, userId) {
