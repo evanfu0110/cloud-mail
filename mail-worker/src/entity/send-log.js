@@ -12,8 +12,8 @@ export const sendLog = sqliteTable('send_log', {
     error: text('error'),
     createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull(),
 }, (table) => ({
-    // 一个号只能给一个目标发一次
-    uniquePair: uniqueIndex('unique_account_target').on(table.accountId, table.targetUserId),
+    // 移除唯一索引以支持重复发送
+    // uniquePair: uniqueIndex('unique_account_target').on(table.accountId, table.targetUserId),
 }));
 
 export default sendLog

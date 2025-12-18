@@ -20,3 +20,13 @@ app.get('/campaign/logs', async (c) => {
     const data = await campaignService.listLogs(c, userContext.getUserId(c));
     return c.json(result.ok(data));
 });
+
+// [临时修复] 用于远程环境删除唯一索引
+app.get('/campaign/fix-unique-index', async (c) => {
+    try {
+        await c.env.db.prepare("DROP INDEX IF EXISTS unique_account_target").run();
+        return c.json(result.ok("SUCCESS: Unique index dropped. You can now send repeat emails."));
+    } catch (e) {
+        return c.json(result.error("FAILED: " + e.message));
+    }
+});
