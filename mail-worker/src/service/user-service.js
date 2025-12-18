@@ -39,10 +39,10 @@ const userService = {
 		user.userId = userRow.userId;
 		user.sendCount = userRow.sendCount;
 		user.email = userRow.email;
-		user.account = account;
-		user.name = account.name;
-		user.permKeys = permKeys;
-		user.role = roleRow
+		user.account = account || { name: emailUtils.getName(userRow.email) };
+		user.name = account?.name || emailUtils.getName(userRow.email);
+		user.permKeys = permKeys || [];
+		user.role = roleRow || { name: 'User' };
 
 		if (c.env.admin === userRow.email) {
 			user.role = constant.ADMIN_ROLE

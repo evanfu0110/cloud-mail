@@ -78,7 +78,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import axios from 'axios'
+import http from '@/axios/index.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 
@@ -101,11 +101,9 @@ onMounted(() => {
 async function getList() {
   loading.value = true
   try {
-    const res = await axios.get('/api/target-user/list', { params })
-    if (res.data.code === 200) {
-      list.value = res.data.data.list
-      total.value = res.data.data.total
-    }
+    const data = await http.get('/target-user/list', { params })
+    list.value = data.list
+    total.value = data.total
   } catch (error) {
     console.error(error)
   } finally {
@@ -148,13 +146,11 @@ async function handleFileChange(file) {
 async function importEmails(emails) {
   loading.value = true
   try {
-    const res = await axios.post('/api/target-user/import', { emails })
-    if (res.data.code === 200) {
-      ElMessage.success(t('importSuccess', { count: res.data.data.count }))
-      getList()
-    }
+    const data = await http.post('/target-user/import', { emails })
+    ElMessage.success(t('importSuccess', { count: data.count }))
+    getList()
   } catch (error) {
-    ElMessage.error('导入失败')
+    console.error(error)
   } finally {
     loading.value = false
   }
@@ -163,22 +159,18 @@ async function importEmails(emails) {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(t('delConfirm', { msg: row.email }), t('warning'), { type: 'warning' })
-    const res = await axios.delete('/api/target-user/delete', { params: { targetUserIds: row.targetUserId } })
-    if (res.data.code === 200) {
-      ElMessage.success(t('delSuccessMsg'))
-      getList()
-    }
+    await http.delete('/target-user/delete', { params: { targetUserIds: row.targetUserId } })
+    ElMessage.success(t('delSuccessMsg'))
+    getList()
   } catch (error) {}
 }
 
 async function handleClear() {
   try {
     await ElMessageBox.confirm(t('confirmClearPool'), t('warning'), { type: 'warning' })
-    const res = await axios.delete('/api/target-user/clear')
-    if (res.data.code === 200) {
-      ElMessage.success(t('clearSuccess'))
-      getList()
-    }
+    await http.delete('/target-user/clear')
+    ElMessage.success(t('clearSuccess'))
+    getList()
   } catch (error) {}
 }
 

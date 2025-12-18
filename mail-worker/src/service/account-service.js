@@ -266,10 +266,14 @@ const accountService = {
 	},
 
 	async batchGenerate(c, params, userId) {
-		const { prefix, length, count: genCount, domain } = params;
+		let { prefix, length, count: genCount, domain } = params;
 		const { minEmailPrefix, emailPrefixFilter } = await settingService.query(c);
 
-		if (genCount > 100) throw new BizError(t('batchLimit')); // 限制一次最多生成 100 个
+		// 确保参数为数字
+		genCount = Number(genCount);
+		length = Number(length);
+
+		if (genCount > 1000) throw new BizError(t('batchLimit')); // 提升限制到 1000
 
 		const userRow = await userService.selectById(c, userId);
 		const roleRow = await roleService.selectById(c, userRow.type);
@@ -285,7 +289,6 @@ const accountService = {
 		}
 
 		const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-		const list = [];
 		const accountEmails = [];
 
 		for (let i = 0; i < genCount; i++) {
@@ -293,11 +296,13 @@ const accountService = {
 			for (let j = 0; j < length; j++) {
 				randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
 			}
-			const emailName = prefix + randomStr;
+			const emailName = (prefix || '') + randomStr;
 			const email = `${emailName}@${domain}`;
 
+			// 如果生成的长度小于系统要求的最小长度，则跳过
 			if (emailName.length < minEmailPrefix) continue;
-			if (emailPrefixFilter.some(content => emailName.includes(content))) continue;
+			// 过滤逻辑
+			if (emailPrefixFilter && emailPrefixFilter.some(content => emailName.includes(content))) continue;
 
 			accountEmails.push({
 				email: email,
@@ -307,8 +312,11 @@ const accountService = {
 			});
 		}
 
-		if (accountEmails.length > 0) {
-			await orm(c).insert(account).values(accountEmails).run();
+		// 分片插入 D1，防止单次请求过载
+		const chunkSize = 100;
+		for (let i = 0; i < accountEmails.length; i += chunkSize) {
+			const chunk = accountEmails.slice(i, i + chunkSize);
+			await orm(c).insert(account).values(chunk).run();
 		}
 
 		return { count: accountEmails.length };

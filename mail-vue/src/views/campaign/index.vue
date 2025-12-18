@@ -59,7 +59,7 @@
 import { onMounted, reactive, ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import axios from 'axios'
+import http from '@/axios/index.js'
 import { ElMessage } from 'element-plus'
 
 const { t } = useI18n()
@@ -88,10 +88,8 @@ onMounted(() => {
 async function getStats() {
   loadingStats.value = true
   try {
-    const res = await axios.get('/api/campaign/stats')
-    if (res.data.code === 200) {
-      availableCount.value = res.data.data.count
-    }
+    const data = await http.get('/campaign/stats')
+    availableCount.value = data.count
   } catch (error) {
     console.error(error)
   } finally {
@@ -107,25 +105,20 @@ async function startCampaign() {
   
   while (running.value) {
     try {
-      const res = await axios.post('/api/campaign/send', form)
-      if (res.data.code === 200) {
-        const data = res.data.data
-        sentCount.value += data.sent
-        
-        if (data.status === 'finished' || data.sent === 0) {
-          running.value = false
-          status.value = 'finished'
-          ElMessage.success('Campaign Completed')
-          break
-        }
-        
-        // 可选：稍作停顿，避免压力过大
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      } else {
-        throw new Error(res.data.message)
+      const data = await http.post('/campaign/send', form)
+      sentCount.value += data.sent
+      
+      if (data.status === 'finished' || data.sent === 0) {
+        running.value = false
+        status.value = 'finished'
+        ElMessage.success('Campaign Completed')
+        break
       }
+      
+      // 稍作停顿，避免压力过大
+      await new Promise(resolve => setTimeout(resolve, 1000))
     } catch (error) {
-      ElMessage.error('Batch send failed: ' + error.message)
+      console.error(error)
       running.value = false
       status.value = 'error'
       break

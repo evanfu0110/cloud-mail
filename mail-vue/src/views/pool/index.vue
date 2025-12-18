@@ -47,7 +47,7 @@
     <el-dialog v-model="showGenDialog" :title="$t('batchGenerate')" width="400px">
       <el-form :model="genForm" label-width="80px">
         <el-form-item :label="$t('genCount')">
-          <el-input-number v-model="genForm.count" :min="1" :max="100" />
+          <el-input-number v-model="genForm.count" :min="1" :max="1000" />
         </el-form-item>
         <el-form-item :label="$t('prefix')">
           <el-input v-model="genForm.prefix" placeholder="可选" />
@@ -74,7 +74,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingStore } from '@/store/setting.js'
-import axios from 'axios'
+import http from '@/axios/index.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 
@@ -110,11 +110,9 @@ onMounted(() => {
 async function getList() {
   loading.value = true
   try {
-    const res = await axios.get('/api/account/pool/list', { params })
-    if (res.data.code === 200) {
-      list.value = res.data.data.list
-      total.value = res.data.data.total
-    }
+    const data = await http.get('/account/pool/list', { params })
+    list.value = data.list
+    total.value = data.total
   } catch (error) {
     console.error(error)
   } finally {
@@ -125,14 +123,12 @@ async function getList() {
 async function handleGenerate() {
   genLoading.value = true
   try {
-    const res = await axios.post('/api/account/batch-generate', genForm)
-    if (res.data.code === 200) {
-      ElMessage.success(t('generateSuccess'))
-      showGenDialog.value = false
-      getList()
-    }
+    const data = await http.post('/account/batch-generate', genForm)
+    ElMessage.success(t('generateSuccess'))
+    showGenDialog.value = false
+    getList()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || 'Error')
+    console.error(error)
   } finally {
     genLoading.value = false
   }
@@ -141,22 +137,18 @@ async function handleGenerate() {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(t('delConfirm', { msg: row.email }), t('warning'), { type: 'warning' })
-    const res = await axios.delete('/api/account/pool/delete', { params: { accountIds: row.accountId } })
-    if (res.data.code === 200) {
-      ElMessage.success(t('delSuccessMsg'))
-      getList()
-    }
+    await http.delete('/account/pool/delete', { params: { accountIds: row.accountId } })
+    ElMessage.success(t('delSuccessMsg'))
+    getList()
   } catch (error) {}
 }
 
 async function handleClear() {
   try {
     await ElMessageBox.confirm(t('confirmClearPool'), t('warning'), { type: 'warning' })
-    const res = await axios.delete('/api/account/pool/clear')
-    if (res.data.code === 200) {
-      ElMessage.success(t('clearSuccess'))
-      getList()
-    }
+    await http.delete('/account/pool/clear')
+    ElMessage.success(t('clearSuccess'))
+    getList()
   } catch (error) {}
 }
 
