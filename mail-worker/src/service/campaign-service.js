@@ -77,11 +77,12 @@ const campaignService = {
             for (let i = 0; i < Number(repeatCount); i++) {
                 try {
                     await emailService.send(c, {
-                        fromName: 'Pool Service',
-                        fromEmail: pair.from_email,
-                        toEmail: pair.to_email,
+                        accountId: pair.account_id,
+                        name: 'Pool Service',
+                        receiveEmail: [pair.to_email],
                         subject: subject,
-                        content: content
+                        content: content,
+                        attachments: []
                     }, userId);
 
                     // 记录日志
